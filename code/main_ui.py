@@ -154,7 +154,7 @@ def process_block(gray_block, x_off, y_off, results, lock, block_id, output_dir,
                 pass
 
         # Выделяем класс кометы
-        if elongation >= 5 and brightness > 0.4:
+        if elongation >= 3 and brightness > 0.1:
             obj_class = "Flying Comet"
             color = (255, 128, 0)
         else:
