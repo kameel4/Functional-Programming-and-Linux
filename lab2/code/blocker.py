@@ -1,61 +1,86 @@
-# blocker.py
-import subprocess
-import threading
-import time
-import logging
-import os
+#!/usr/bin/env python3
+import time, json
+from pathlib import Path
 
-LOG_PATH = "logs/blocked_ips.log"
-os.makedirs(os.path.dirname(LOG_PATH) or ".", exist_ok=True)
+blocked = {}          # ip -> expire_ts or None
+whitelist = set()
+global_lock_until = 0
+_whitelist_file = None
 
-logger = logging.getLogger("blocker")
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    fh = logging.FileHandler(LOG_PATH)
-    fmt = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
-    fh.setFormatter(fmt)
-    logger.addHandler(fh)
+def _now(): return time.time()
 
-def _iptables_check_rule(ip):
+def load_whitelist(path: str):
+    global _whitelist_file
+    _whitelist_file = Path(path)
+    if not _whitelist_file.exists(): return
     try:
-        subprocess.run(["sudo", "iptables", "-C", "INPUT", "-s", ip, "-j", "DROP"],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-    except FileNotFoundError:
-        return False
+        with _whitelist_file.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line=line.strip()
+                if not line: continue
+                try:
+                    obj=json.loads(line)
+                except Exception:
+                    continue
+                ip=obj.get("ip")
+                if ip: whitelist.add(ip)
+    except Exception:
+        pass
 
-def block_ip(ip, duration=None):
+def _append_whitelist_file(cmd: dict):
+    if not _whitelist_file: return
     try:
-        if _iptables_check_rule(ip):
-            logger.info(f"Attempted to block {ip}, but rule already present.")
-        else:
-            subprocess.run(["sudo", "iptables", "-I", "INPUT", "-s", ip, "-j", "DROP"],
-                           check=True)
-            logger.info(f"Blocked IP: {ip}")
-        if duration and duration > 0:
-            t = threading.Timer(duration, unblock_ip, args=(ip,))
-            t.daemon = True
-            t.start()
-            logger.info(f"Scheduled unblock for {ip} in {duration} seconds")
-        return True
-    except Exception as e:
-        logger.exception(f"Failed to block {ip}: {e}")
-        return False
+        _whitelist_file.parent.mkdir(parents=True, exist_ok=True)
+        with _whitelist_file.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(cmd, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
-def unblock_ip(ip):
-    try:
-        removed = False
-        while _iptables_check_rule(ip):
-            subprocess.run(["sudo", "iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"],
-                           check=True)
-            removed = True
-        if removed:
-            logger.info(f"Unblocked IP: {ip}")
-        else:
-            logger.info(f"Tried to unblock {ip} but no rule found")
-        return True
-    except Exception as e:
-        logger.exception(f"Failed to unblock {ip}: {e}")
+def add_whitelist(ip: str) -> bool:
+    if not ip: return False
+    whitelist.add(ip)
+    _append_whitelist_file({"cmd":"whitelist","ip":ip,"time":int(_now())})
+    return True
+
+def remove_whitelist(ip: str) -> bool:
+    if not ip: return False
+    whitelist.discard(ip)
+    _append_whitelist_file({"cmd":"unwhitelist","ip":ip,"time":int(_now())})
+    return True
+
+def is_whitelisted(ip: str) -> bool:
+    return ip in whitelist
+
+def set_global_lockdown(duration: int):
+    """Block everyone except whitelist for <duration> seconds."""
+    global global_lock_until
+    end = _now() + max(0, int(duration))
+    if end > global_lock_until:
+        global_lock_until = end
+
+def is_global_locked() -> bool:
+    global global_lock_until
+    if global_lock_until <= 0: return False
+    if _now() > global_lock_until:
+        global_lock_until = 0
         return False
+    return True
+
+def block_ip(ip: str, duration: int = 60) -> bool:
+    if not ip: return False
+    if is_whitelisted(ip): return False
+    expire = None if not duration or duration <= 0 else int(_now() + int(duration))
+    blocked[ip] = expire
+    return True
+
+def is_blocked(ip: str) -> bool:
+    if is_whitelisted(ip): return False
+    if is_global_locked(): return True
+    t = blocked.get(ip)
+    if not t: return False
+    if t is None: return True
+    if _now() > t:
+        try: del blocked[ip]
+        except KeyError: pass
+        return False
+    return True

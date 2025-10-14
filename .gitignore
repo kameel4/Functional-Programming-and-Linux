@@ -1,3 +1,6 @@
 *.tiff
 *.jpg
 max.py
+*.tif
+*.tar
+code/blocks/

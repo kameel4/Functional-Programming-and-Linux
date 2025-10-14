@@ -1,36 +1,19 @@
-# rules.py
+from scapy.all import IP, TCP, UDP
 
-from scapy.layers.inet import IP, TCP, UDP
-from collections import defaultdict
-import time
 
-# глобальное состояние
-state = {
-    "packet_count": defaultdict(list)
-}
+state={"counts":{},"ports_common":{80,443,53,123,22,25,110,143,587,993,995}}
 
-# пример 1: слишком частые пакеты с одного IP
-def rule_high_packet_rate(pkt, state):
-    if IP not in pkt:
-        return False, ""
-    src = pkt[IP].src
-    now = time.time()
-    timestamps = state["packet_count"][src]
-    timestamps.append(now)
-    # храним последние 5 сек
-    state["packet_count"][src] = [t for t in timestamps if now - t < 5]
-    if len(state["packet_count"][src]) > 20:
-        return True, "Высокая частота пакетов"
-    return False, ""
 
-# пример 2: нестандартные порты
-def rule_unusual_port(pkt, state):
-    if TCP in pkt:
-        dport = pkt[TCP].dport
-        if dport not in [80, 443, 22]:
-            return True, f"Необычный порт TCP {dport}"
-    if UDP in pkt:
-        dport = pkt[UDP].dport
-        if dport not in [53, 67, 68]:
-            return True, f"Необычный порт UDP {dport}"
-    return False, ""
+def rule_high_packet_rate(pkt, st):
+    if IP not in pkt: return False, ""
+    s=pkt[IP].src
+    st["counts"].setdefault(s,0)
+    st["counts"][s]+=1
+    return st["counts"][s]%20==0, "high_rate"
+
+
+def rule_unusual_port(pkt, st):
+    if TCP in pkt: d=pkt[TCP].dport
+    elif UDP in pkt: d=pkt[UDP].dport
+    else: return False, ""
+    return d not in st["ports_common"], f"port_{d}"
