@@ -94,7 +94,7 @@ if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8888)
+    p.add_argument("--port", type=int, default=50001)
     p.add_argument("--nick", default="user")
     p.add_argument("--room", default="general")
     args = p.parse_args()
