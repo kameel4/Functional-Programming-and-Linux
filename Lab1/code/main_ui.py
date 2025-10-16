@@ -1,6 +1,5 @@
 import sys, os, threading
 import numpy as np
-import tifffile
 from PIL import Image
 import cv2
 from PyQt5.QtCore import Qt
@@ -128,10 +127,16 @@ def process_block(gray_block, x_off, y_off, results, lock, block_id, output_dir,
     block_bgr = cv2.cvtColor(block_bgr, cv2.COLOR_RGB2BGR)
 
     threshold = 0.05
-    mask = (gray_block >= threshold).astype(np.uint8) * 255
+    # создаем маску из пикселей с яркостью выше threshold
+    mask_initial = (gray_block >= threshold).astype(np.uint8) * 255
+    
+    # морфологическое открытие - убираем шум
     kernel = np.ones((3,3), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    mask_open = cv2.morphologyEx(mask_initial, cv2.MORPH_OPEN, kernel, iterations=1)
+    
+    # морфологическое закрытие - убираем дыры
+    mask_close = cv2.morphologyEx(mask_open, cv2.MORPH_CLOSE, kernel, iterations=2)
+    mask = mask_close
 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
