@@ -43,7 +43,6 @@ async def test_file_too_large_rejected(running_server):
 
 @pytest.mark.asyncio
 async def test_idle_timeout_disconnects(running_server):
-    # В conftest мы уменьшили IDLE_TIMEOUT до 1с
     r, w = await asyncio.open_connection(*running_server)
     w.write(b'{"type":"join","nick":"Idle","room":"general"}\n'); await w.drain()
     await r.readline()

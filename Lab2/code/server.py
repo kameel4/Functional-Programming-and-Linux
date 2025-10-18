@@ -6,7 +6,18 @@ import json
 from dataclasses import dataclass, field
 from typing import Dict, Set, Optional, Any
 
-from Lab2.code.protocol import dumps_message, loads_message, ProtocolError
+try:
+    from protocol import dumps_message, loads_message, ProtocolError
+except Exception as e:
+    pass
+
+try:
+    from Lab2.code.protocol import dumps_message, loads_message, ProtocolError
+except Exception as e:
+    pass
+
+
+
 
 MAX_MESSAGE_BYTES = 64 * 1024  # ограничим размер входной строки
 MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB на файл

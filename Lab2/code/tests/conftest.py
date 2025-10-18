@@ -18,9 +18,8 @@ def any_free_port():
 
 @pytest_asyncio.fixture
 async def running_server(any_free_port, monkeypatch):
-    # Чтобы тесты отрабатывали быстрее, уменьшим таймауты:
     monkeypatch.setattr(srv_mod, "IDLE_TIMEOUT", 5)   
-    monkeypatch.setattr(srv_mod, "MAX_MESSAGE_BYTES", 8 * 1024 * 1024)    # секунд
+    monkeypatch.setattr(srv_mod, "MAX_MESSAGE_BYTES", 8 * 1024 * 1024)   
     # Можно при желании уменьшить лимиты сообщений/файлов аналогично.
 
     chat = srv_mod.ChatServer()
