@@ -1,0 +1,18 @@
+
+---
+
+### `configs/config.yaml`  
+**Зачем:** все настройки — куда писать лог, что мониторить, интервалы опроса и т.д.
+```yaml
+log_dir: "./logs"
+log_file: "events.jsonl"
+log_max_bytes: 10485760  # 10 MB
+log_backup_count: 5
+
+watch_dirs:
+  - "/etc"
+  - "/var/log"
+  - "./"
+
+process_poll_interval: 2
+gui_refresh_interval: 2
